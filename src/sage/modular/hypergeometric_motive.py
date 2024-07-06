@@ -189,7 +189,8 @@ def characteristic_polynomial_from_traces(traces, d, q, i, sign, deg=None, use_f
         data[k] = sign * coeffs[d - k] * q**(i * (k - d / 2))
     return ring(data)
 
-def enumerate_hypergeometric_data(d, weight=None):
+
+def enumerate_hypergeometric_data(d, weight=None, twist_minimal=False, primitive=False):
     r"""
     Return an iterator over parameters of hypergeometric motives (up to swapping).
 
@@ -198,6 +199,10 @@ def enumerate_hypergeometric_data(d, weight=None):
     - ``d`` -- the degree
 
     - ``weight`` -- optional integer, to specify the motivic weight
+
+    - ``twist_minimal`` -- optional boolean, to restrict to twist-minimal data
+    
+    - ``primitive`` -- optional boolean, to restrict to primitive data
 
     EXAMPLES::
 
@@ -219,11 +224,16 @@ def enumerate_hypergeometric_data(d, weight=None):
     for a, b in combinations(vectors, 2):
         if not any(a[j] and b[j] for j in range(N)):
             H = HypergeometricData(cyclotomic=(formule(a), formule(b)))
-            if weight is None or H.weight() == weight:
-                yield H
+            if weight is not None and H.weight() != weight:
+                continue
+            if twist_minimal and not H.is_twist_minimal():
+                continue
+            if primitive and not H.is_primitive():
+                continue
+            yield H
 
 
-def possible_hypergeometric_data(d, weight=None) -> list:
+def possible_hypergeometric_data(d, weight=None, twist_minimal=False, primitive=False) -> list:
     """
     Return the list of possible parameters of hypergeometric motives (up to swapping).
 
@@ -232,14 +242,22 @@ def possible_hypergeometric_data(d, weight=None) -> list:
     - ``d`` -- the degree
 
     - ``weight`` -- optional integer, to specify the motivic weight
+    
+    - ``twist_minimal`` -- optional boolean, to restrict to twist-minimal data
+    
+    - ``primitive`` -- optional boolean, to restrict to primitive data
 
     EXAMPLES::
 
         sage: from sage.modular.hypergeometric_motive import possible_hypergeometric_data as P
         sage: [len(P(i,weight=2)) for i in range(1, 7)]
         [0, 0, 10, 30, 93, 234]
+        sage: [len(P(i,weight=2,primitive=True)) for i in range(1, 7)]
+        [0, 0, 10, 30, 93, 224]
+        sage: [len(P(i,twist_minimal=True)) for i in range(1, 7)]
+        [1, 8, 8, 90, 77, 641]
     """
-    return list(enumerate_hypergeometric_data(d, weight))
+    return list(enumerate_hypergeometric_data(d, weight, twist_minimal, primitive))
 
 
 def cyclotomic_to_alpha(cyclo) -> list:
@@ -1057,6 +1075,21 @@ class HypergeometricData:
             3
         """
         return gcd(self.gamma_list())
+
+    def is_twist_minimal(self) -> bool:
+        """
+        Return whether this data is twist-minimal.
+
+        EXAMPLES::
+
+        """
+        alpha_beta1 = self.alpha_beta()
+        alpha_beta2 = self.twist().alpha_beta()
+        d1 = sorted([[QQ(i).denominator() for i in j] for j in alpha_beta1], reverse=True)
+        d2 = sorted([[QQ(i).denominator() for i in j] for j in alpha_beta2], reverse=True)
+        if d1 != d2:
+            return d1 < d2
+        return sorted(alpha_beta1, reverse=True) <= sorted(alpha_beta2, reverse=True)
 
     def has_symmetry_at_one(self) -> bool:
         """
